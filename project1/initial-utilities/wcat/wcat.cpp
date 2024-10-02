@@ -4,8 +4,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <sstream>
 
 using namespace std;
+
+// Source of all code in this file is lecture materials from this class
 
 int main(int argc, char **argv) {
     // Validate arguments
@@ -17,7 +20,10 @@ int main(int argc, char **argv) {
         // Open the file and check validity
         int fileDescriptor = open(argv[i], O_RDONLY);
         if (fileDescriptor < 0) {
-            cerr << "wcat: cannot open file" << endl;
+            stringstream stringOut;
+            stringOut << "wcat: cannot open file" << endl;
+            string str = stringOut.str();
+            write(STDOUT_FILENO, str.c_str(), str.length()); // length of string = bytes (char = 8bit)
             exit(1);
         } else if (fileDescriptor == 1) {
             cerr << "Error calling open()" << endl;
