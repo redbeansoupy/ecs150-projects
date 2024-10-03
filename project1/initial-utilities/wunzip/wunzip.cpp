@@ -37,7 +37,7 @@ int unzip(int fd) {
                 // char
                 string repeatingChars = "";
                 // fill the string with the same char
-                for (int j = 0; j < integer_4byte; j++) {
+                for (int j = 0; j < int(integer_4byte); j++) {
                     repeatingChars += buffer[i];
                 }
 

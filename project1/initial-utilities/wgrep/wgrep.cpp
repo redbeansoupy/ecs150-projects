@@ -40,7 +40,7 @@ int findWord(int fileDescriptor, char *searchTerm) {
             if (buffer[i] == '\n') {
                 // Search the string
                 int pos = currentLine.find(searchTerm); // If term is found, returns position of first char. Else, -1
-                if ((pos > -1) && (pos < currentLine.length())) { // If term was found
+                if ((pos > -1) && (pos < int(currentLine.length()))) { // If term was found
                     // write the current line to stdout
                     writeLine2Stdout(currentLine);
                 }
