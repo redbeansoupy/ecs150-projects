@@ -22,7 +22,7 @@ int findWord(int fileDescriptor, char *searchTerm) {
     if (fileDescriptor < 0) {
         writeLine2Stdout("wgrep: cannot open file");
         exit(1);
-    } else if (fileDescriptor == 1) {
+    } else if (fileDescriptor == -1) {
         cerr << "Error calling open()" << endl;
         exit(1);
     }

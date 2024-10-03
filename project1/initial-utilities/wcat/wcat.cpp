@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
             string str = stringOut.str();
             write(STDOUT_FILENO, str.c_str(), str.length()); // length of string = bytes (char = 8bit)
             exit(1);
-        } else if (fileDescriptor == 1) {
+        } else if (fileDescriptor == -1) {
             cerr << "Error calling open()" << endl;
             exit(1);
         }
