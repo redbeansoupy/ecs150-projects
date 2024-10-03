@@ -67,8 +67,10 @@ int main(int argc, char **argv) {
     } else if (argc == 2) { // case search term: use stdin
         findWord(STDIN_FILENO, argv[1]);
     } else { // case there are files -- get file descriptors?
-        fileDescriptor = open(argv[2], O_RDONLY);
-        findWord(fileDescriptor, argv[1]);
+        for (int i = 2; i < argc; i++) {
+            fileDescriptor = open(argv[i], O_RDONLY);
+            findWord(fileDescriptor, argv[1]);
+        }
     }
     return 0;
 }
