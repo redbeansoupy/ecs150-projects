@@ -72,5 +72,9 @@ int main(int argc, char **argv) {
             findWord(fileDescriptor, argv[1]);
         }
     }
+
+    if (fileDescriptor != STDIN_FILENO) {
+            close(fileDescriptor);
+        }
     return 0;
 }

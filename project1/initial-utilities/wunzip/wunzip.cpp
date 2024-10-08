@@ -74,6 +74,10 @@ int main(int argc, char** argv) {
                 exit(1);
             }
             unzip(fileDescriptor);
+
+            if (fileDescriptor != STDIN_FILENO) {
+            close(fileDescriptor);
+            }
         }
     }
 

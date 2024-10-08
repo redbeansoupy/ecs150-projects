@@ -80,6 +80,9 @@ int main(int argc, char **argv) {
                 exit(1);
             }
             zip(fileDescriptor, currentCharChain);
+            if (fileDescriptor != STDIN_FILENO) {
+                 close(fileDescriptor);
+            }
         }
 
         // at the end of the files, make sure to write again
