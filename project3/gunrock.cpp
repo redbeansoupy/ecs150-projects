@@ -27,7 +27,7 @@ int THREAD_POOL_SIZE = 1;
 int BUFFER_SIZE = 1;
 string BASEDIR = "static";
 string SCHEDALG = "FIFO";
-string LOGFILE = "/dev/null";
+string LOGFILE = "goober.txt";
 
 vector<HttpService *> services;
 
@@ -41,7 +41,6 @@ HttpService *find_service(HTTPRequest *request) {
 
   return NULL;
 }
-
 
 void invoke_service_method(HttpService *service, HTTPRequest *request, HTTPResponse *response) {
   stringstream payload;
@@ -104,6 +103,9 @@ void handle_request(MySocket *client) {
   delete client;
 }
 
+// Key modifications:
+// - TODO: Make a fixed-size pool of threads
+// - TODO: Schedule such that higher prio threads run first
 int main(int argc, char *argv[]) {
 
   signal(SIGPIPE, SIG_IGN);
@@ -134,6 +136,10 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
   }
+
+  // https://en.cppreference.com/w/cpp/container/deque
+  deque<string> req_buffer; // FIFO: push_front and pop_back
+  deque<pthread_t> thread_pool;
 
   set_log_file(LOGFILE);
 
