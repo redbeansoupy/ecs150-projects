@@ -27,12 +27,22 @@ int THREAD_POOL_SIZE = 1;
 int BUFFER_SIZE = 1;
 string BASEDIR = "static";
 string SCHEDALG = "FIFO";
-string LOGFILE = "goober.txt";
+string LOGFILE = "goober1.txt";
 
 vector<HttpService *> services;
 
 HttpService *find_service(HTTPRequest *request) {
    // find a service that is registered for this path prefix
+  cout << "find_service called" << endl;
+  cout << "GOOBER: " << (*request).getRequest() << endl;
+  cout << "GOOBER2: " << (*request).getPath() << endl;
+
+    // if the pathname starts with "../", abort
+  string pathname = (*request).getPath();
+  if (pathname.find("..") != string::npos) {
+    sync_print("illegal pathname", "");
+    return NULL;
+  }
   for (unsigned int idx = 0; idx < services.size(); idx++) {
     if (request->getPath().find(services[idx]->pathPrefix()) == 0) {
       return services[idx];
@@ -43,6 +53,7 @@ HttpService *find_service(HTTPRequest *request) {
 }
 
 void invoke_service_method(HttpService *service, HTTPRequest *request, HTTPResponse *response) {
+  cout << "invoke_service_method called" << endl;
   stringstream payload;
 
   // invoke the service if we found one
@@ -60,9 +71,12 @@ void invoke_service_method(HttpService *service, HTTPRequest *request, HTTPRespo
 }
 
 void handle_request(MySocket *client) {
+  cout << "handle_request called" << endl;
   HTTPRequest *request = new HTTPRequest(client, PORT);
   HTTPResponse *response = new HTTPResponse();
   stringstream payload;
+
+  cout << "GOOBER3: " << (*request).getPath() << endl;
   
   // read in the request
   bool readResult = false;
@@ -84,6 +98,7 @@ void handle_request(MySocket *client) {
   }
   
   HttpService *service = find_service(request);
+  if (service == NULL) goto clean_up;
   invoke_service_method(service, request, response);
 
   // send data back to the client and clean up
@@ -92,7 +107,8 @@ void handle_request(MySocket *client) {
   sync_print("write_response", payload.str());
   cout << payload.str() << endl;
   client->write(response->response());
-    
+
+  clean_up: 
   delete response;
   delete request;
 
