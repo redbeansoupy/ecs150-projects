@@ -24,10 +24,17 @@ using namespace std;
 
 int PORT = 8080;
 int THREAD_POOL_SIZE = 1;
-int BUFFER_SIZE = 1;
+size_t BUFFER_SIZE = 1;
 string BASEDIR = "static";
 string SCHEDALG = "FIFO";
 string LOGFILE = "goober1.txt";
+pthread_mutex_t gooberLock;
+pthread_cond_t buffer_cond;
+pthread_cond_t thread_cond;
+
+// https://en.cppreference.com/w/cpp/container/deque
+deque<MySocket*> req_buffer; // FIFO: push_back and pop_front
+vector<pthread_t> thread_pool;
 
 vector<HttpService *> services;
 
@@ -35,7 +42,7 @@ HttpService *find_service(HTTPRequest *request) {
    // find a service that is registered for this path prefix
   cout << "find_service called" << endl;
 
-    // if the pathname starts with "../", abort
+    // if the pathname has "..", abort
   string pathname = (*request).getPath();
   if (pathname.find("..") != string::npos) {
     return NULL;
@@ -98,7 +105,7 @@ void handle_request(MySocket *client) {
 
   // send data back to the client and clean up
   payload.str(""); payload.clear();
-  payload << " RESPONSE " << response->getStatus() << " client: " << (void *) client;
+  payload << " RES  PONSE " << response->getStatus() << " client: " << (void *) client;
   sync_print("write_response", payload.str());
   cout << payload.str() << endl;
   client->write(response->response());
@@ -114,11 +121,50 @@ void handle_request(MySocket *client) {
   delete client;
 }
 
+void bufferThread(MyServerSocket *server, MySocket *client) {
+  while (true) {
+    dthread_mutex_lock(&gooberLock);
+    sync_print("waiting_to_accept", "");
+    while (req_buffer.size() >= BUFFER_SIZE) {
+      dthread_cond_wait(&buffer_cond, &gooberLock); // allow other threads to run during this time
+    }
+    client = server->accept();
+    sync_print("client_accepted", "");
+    req_buffer.push_back(client);
+    dthread_cond_broadcast(&thread_cond); // wake up all threads if they are asleep
+    cout << "broadcasted thread_cond" << endl;
+    dthread_mutex_unlock(&gooberLock);
+  }
+  return;
+}
+
+void *workerThread(void* arg) {
+  // This is an individual thread, so we just need to check that there are requests to process
+  // The number of available threads is inherently handled by this!
+  while (true) {
+    dthread_mutex_lock(&gooberLock);
+    MySocket *thisClient = NULL;
+    cout << "size of buffer right now: " << req_buffer.size() << endl;
+    while (req_buffer.size() == 0) {
+      //cout << "thread sleep" << endl;
+      dthread_cond_wait(&thread_cond, &gooberLock); // wait until there are things to process
+    }
+    cout << "thread woke up" << endl;
+    thisClient = req_buffer[0];
+    req_buffer.pop_front(); // decrease size
+    dthread_cond_signal(&buffer_cond); // signal that the buffer isn't full anymore
+    dthread_mutex_unlock(&gooberLock);
+    
+    handle_request(thisClient); // thisClient is not shared among threads
+  }
+}
+
 // Key modifications:
 // - TODO: Make a fixed-size pool of threads
 // - TODO: Schedule such that higher prio threads run first
 int main(int argc, char *argv[]) {
-
+  cout << "buffer cond addr: " << (void*) &buffer_cond << endl;
+  cout << "thread cond addr: " << (void*) &thread_cond << endl;
   signal(SIGPIPE, SIG_IGN);
   int option;
 
@@ -148,35 +194,32 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // https://en.cppreference.com/w/cpp/container/deque
-  deque<MySocket*> req_buffer; // FIFO: push_back and pop_front
-  deque<pthread_t> thread_pool;
-  //pthread_mutex_t gooberLock;
-
   set_log_file(LOGFILE);
 
   sync_print("init", "");
   MyServerSocket *server = new MyServerSocket(PORT);
-  MySocket *client;
+  MySocket *client = NULL;
 
   // The order that you push services dictates the search order
   // for path prefix matching
   services.push_back(new FileService(BASEDIR));
   
-  while(true) {
-    // The program should be able to take in multiple clients at a time and handle their requests.
-    sync_print("waiting_to_accept", "");
-    client = server->accept();
-    if (req_buffer.size() < BUFFER_SIZE) {
-      req_buffer.push_back(client);
-    }
-    sync_print("client_accepted", "");
+  // The program should be able to take in multiple clients at a time and handle their requests.
+  // instantiate request handlers
+  for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+    pthread_t newThread;
+    pthread_attr_t *attr = NULL; // from docs: If attr is NULL, then the thread is created with default attributes.
+    void *arg = NULL; // this is passed to start_routine
 
-    MySocket *thisClient = NULL;
-    if (req_buffer.size() > 0) {
-      thisClient = req_buffer[0];
-      req_buffer.pop_front();
+    int threadCreateErr = dthread_create(&newThread, attr, &workerThread, arg);
+    if (threadCreateErr) {
+      cout << "issue creating new thread" << endl;
+      return 1;
+    } else {
+      cout << "new thread created" << endl;
     }
-    handle_request(thisClient);
   }
+
+  // manage the request buffer in the main thread
+  bufferThread(server, client);
 }
