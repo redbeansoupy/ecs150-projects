@@ -34,13 +34,10 @@ vector<HttpService *> services;
 HttpService *find_service(HTTPRequest *request) {
    // find a service that is registered for this path prefix
   cout << "find_service called" << endl;
-  cout << "GOOBER: " << (*request).getRequest() << endl;
-  cout << "GOOBER2: " << (*request).getPath() << endl;
 
     // if the pathname starts with "../", abort
   string pathname = (*request).getPath();
   if (pathname.find("..") != string::npos) {
-    sync_print("illegal pathname", "");
     return NULL;
   }
   for (unsigned int idx = 0; idx < services.size(); idx++) {
@@ -75,8 +72,6 @@ void handle_request(MySocket *client) {
   HTTPRequest *request = new HTTPRequest(client, PORT);
   HTTPResponse *response = new HTTPResponse();
   stringstream payload;
-
-  cout << "GOOBER3: " << (*request).getPath() << endl;
   
   // read in the request
   bool readResult = false;
@@ -154,8 +149,9 @@ int main(int argc, char *argv[]) {
   }
 
   // https://en.cppreference.com/w/cpp/container/deque
-  deque<string> req_buffer; // FIFO: push_front and pop_back
+  deque<MySocket*> req_buffer; // FIFO: push_back and pop_front
   deque<pthread_t> thread_pool;
+  //pthread_mutex_t gooberLock;
 
   set_log_file(LOGFILE);
 
@@ -168,9 +164,19 @@ int main(int argc, char *argv[]) {
   services.push_back(new FileService(BASEDIR));
   
   while(true) {
+    // The program should be able to take in multiple clients at a time and handle their requests.
     sync_print("waiting_to_accept", "");
     client = server->accept();
+    if (req_buffer.size() < BUFFER_SIZE) {
+      req_buffer.push_back(client);
+    }
     sync_print("client_accepted", "");
-    handle_request(client);
+
+    MySocket *thisClient = NULL;
+    if (req_buffer.size() > 0) {
+      thisClient = req_buffer[0];
+      req_buffer.pop_front();
+    }
+    handle_request(thisClient);
   }
 }
